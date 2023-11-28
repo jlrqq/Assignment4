@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.util.*;
 
 
@@ -57,6 +58,8 @@ public class UdpVectorClient {
              * write your code to send message to the server. clientSocket.send(messageTosend);
              */
 
+            DatagramPacket messageTosend = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+            clientSocket.send(messageTosend);
 
             // check if the user wants to see the history
             if(messageBody.equals("history")) {
@@ -69,10 +72,32 @@ public class UdpVectorClient {
                  * You can use the clientSocket.setSoTimeout(timeinmiliseconds); to detect if the all the messages have been received
                  * update the logs list
                  */
+                clientSocket.setSoTimeout(50000);
+                while (true) { 
+                    try {
+                        DatagramPacket messageToreceive = new DatagramPacket(receiveData, receiveData.length);
+                        clientSocket.receive(messageToreceive);
+                        messageToreceive = new DatagramPacket(receiveData, receiveData.length);
+                        clientSocket.receive(messageToreceive);
+                        String receivedMessage = new String(messageToreceive.getData(), 0, messageToreceive.getLength());
+                        if (!receivedMessage.isEmpty()) {
+                            logs.add(receivedMessage);
+                        } else
+                            break;
+                    } catch (SocketTimeoutException e) {
+                        System.out.println("Error timeout reached.");
+                        break;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        break;
+                    }
+                }
 
                 UdpVectorClient uc = new UdpVectorClient();
                 uc.showHistory(logs); // gives out all the unsorted logs stored at the server
                 uc.showSortedHistory(logs); // shows sorted logs
+
+                System.out.println("History successfully printed!");
             }
             else
             {
@@ -105,6 +130,45 @@ public class UdpVectorClient {
          * to store the sorted logs for printing you could use LinkedHashMap
          */
 
-    }
+        // Create a custom comparator to sort logs
+        Comparator<String> customComparator = new Comparator<String>() {
+            @Override
+            public int compare(String message1, String message2) {
+                // Extract the vector clocks from the messages
+                int[] clock1 = extractVectorClock(message1);
+                int[] clock2 = extractVectorClock(message2);
 
+                // Compare the vector clocks individually 
+                for (int i = 0; i < clock1.length; i++) {
+                    if (clock1[i] < clock2[i]) {
+                        return -1;
+                    } else if (clock1[i] > clock2[i]) {
+                        return 1;
+                    }
+                }
+
+                // If vector clocks are equal, compare the entire message
+                return message1.compareTo(message2);
+        }
+        
+            // Extract and convert the vector clock from the message into an array
+            private int[] extractVectorClock(String message) {
+                String clockString = message.substring(message.lastIndexOf('[') + 1, message.lastIndexOf(']'));
+                String[] clockValues = clockString.split(", ");
+                int[] clock = new int[clockValues.length];
+                for (int i = 0; i < clock.length; i++) {
+                    clock[i] = Integer.parseInt(clockValues[i]);
+                }
+                return clock;
+            }
+        };
+
+        // Sort the logs using the custom comparator
+        Collections.sort(logs, customComparator);
+
+        // Print the sorted logs
+        for (String message : logs) {
+            System.out.println(message);
+        }
+    }
 }

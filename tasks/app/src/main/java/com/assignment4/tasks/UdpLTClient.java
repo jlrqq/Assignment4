@@ -40,6 +40,7 @@ public class UdpLTClient {
                 /*
                  * write your code to increment clock when the message is sent
                  */
+                lc.tick();
 
                 // check if the user wants to quit
                 if(messageBody.equalsIgnoreCase("quit")){
@@ -51,6 +52,16 @@ public class UdpLTClient {
                  * write your code to send the message to the server
                  */
 
+                // Convert the message to bytes
+                sendData = responseMessage.getBytes();
+
+                // create a DatagramPacket to send the message
+                DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+
+                // send the packet
+                clientSocket.send(sendPacket);
+                
+                // Create and start client thread for receiving messages
                 LTClientThread client;
                 client = new LTClientThread(clientSocket, lc);
                 Thread receiverThread = new Thread(client);
